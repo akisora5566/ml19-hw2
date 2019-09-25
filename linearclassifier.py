@@ -19,6 +19,18 @@ def linear_predict(data, model):
     :rtype: array
     """
     # TODO fill in your code to predict the class by finding the highest scoring linear combination of features
+    d, num_classes = model["weights"].shape
+    weights = model["weights"].transpose()
+    score_all = np.zeros(num_classes)
+    for n in data.T:
+        score_one_data = np.dot(weights, n)
+        score_all = np.vstack([score_all, score_one_data])
+    score_all = np.delete(score_all, (0), axis=0)
+    predict_class = np.argmax(score_all, axis=1)
+
+    return predict_class
+
+
 
 
 def perceptron_update(data, model, label):
@@ -37,7 +49,14 @@ def perceptron_update(data, model, label):
     """
     # TODO fill in your code here to implement the perceptron update, directly updating the model dict
     # and returning the proper boolean value
-
+    score_one_data = np.dot(model["weights"].T, data)
+    predict_max = np.argmax(score_one_data, axis=0)
+    if label != predict_max:
+        model["weights"][:, label] = model["weights"][:, label] + data
+        model["weights"][:, predict_max] = model["weights"][:, predict_max] - data
+        return False
+    else:
+        return True
 
 def log_reg_train(data, labels, params, model=None, check_gradient=False):
     """
