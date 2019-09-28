@@ -18,19 +18,25 @@ def linear_predict(data, model):
     :return: length n vector of class predictions
     :rtype: array
     """
-    # TODO fill in your code to predict the class by finding the highest scoring linear combination of features
-    d, num_classes = model["weights"].shape
+    # Predict the class by finding the highest scoring linear combination of features
+    # Rewritten by akisora5566 on 9/27
+    # Avoid the for loop. Use the matrix multiplication instead.
+
+    d, num_classes = model["weights"].shape     #(2, 4): 2 features, 4 classess
+
     weights = model["weights"].transpose()
+    weighted_scores = np.matmul(weights, data)          # (#classes, d) * (d, n) = (#classes, n)
+    predict_class = np.argmax(weighted_scores, axis=0)  # (,n)
+
+    """ Code by Georgia-max
     score_all = np.zeros(num_classes)
     for n in data.T:
         score_one_data = np.dot(weights, n)
         score_all = np.vstack([score_all, score_one_data])
     score_all = np.delete(score_all, (0), axis=0)
     predict_class = np.argmax(score_all, axis=1)
-
+    """
     return predict_class
-
-
 
 
 def perceptron_update(data, model, label):
@@ -47,16 +53,16 @@ def perceptron_update(data, model, label):
     :return: whether the perceptron correctly predicted the provided true label of the example
     :rtype: bool
     """
-    # TODO fill in your code here to implement the perceptron update, directly updating the model dict
-    # and returning the proper boolean value
+    # Directly updating the model dict and returning the proper boolean value
     score_one_data = np.dot(model["weights"].T, data)
-    predict_max = np.argmax(score_one_data, axis=0)
-    if label != predict_max:
+    predict = np.argmax(score_one_data, axis=0)
+    if label != predict:
         model["weights"][:, label] = model["weights"][:, label] + data
-        model["weights"][:, predict_max] = model["weights"][:, predict_max] - data
+        model["weights"][:, predict] = model["weights"][:, predict] - data
         return False
     else:
         return True
+
 
 def log_reg_train(data, labels, params, model=None, check_gradient=False):
     """
@@ -97,10 +103,37 @@ def log_reg_train(data, labels, params, model=None, check_gradient=False):
         # reshape the weights, which the optimizer prefers to be a vector, to the more convenient matrix form
         new_weights = new_weights.reshape((d, num_classes))
 
-        # TODO fill in your code here to compute the objective value (nll)
+        # Compute the objective value (nll)
 
+        w_x = np.matmul(new_weights.T, data)        #(num_classes,n)
+        logsumexp_w_x = logsumexp(w_x, dim=0)       #(1,n)
+        #print ("logsumexp_w_x, logsumexp_w_x.shape\n", logsumexp_w_x, logsumexp_w_x.shape)  # Leave it here
+        sum_logsumexp_w_x = np.sum(logsumexp_w_x)
 
-        # TODO fill in your code here to compute the gradient
+        sum_wyi_xi = 0
+        for i in range (0,n):
+            wyi_xi = np.matmul(new_weights[:, labels[i]].T, data[:,i])
+            sum_wyi_xi += wyi_xi
+
+        frob_weights = np.linalg.norm(new_weights, ord='fro')
+
+        nll = (params["lambda"] / 2) + frob_weights + sum_logsumexp_w_x - sum_wyi_xi    # (1,n)
+
+        # Compute the gradient
+        # TODO Revisit gradient check. Gradient difference too high
+        gradient = np.zeros((d, 1, num_classes))
+        for c in range (0, num_classes):
+            wc_x =  np.matmul(new_weights[:, c].T, data)    # (1,n)
+            logged_first_term = wc_x - logsumexp_w_x        # (1,n)
+            first_term = np.exp(logged_first_term)          # (1,n)
+            # - I(yi == c)
+            for i in range (0, n):
+                if labels[i] == c:
+                    first_term[0,i] -= 1
+            sum_term = np.sum(np.multiply(data, np.tile(first_term, (d,1))), axis=1)
+            gradient_wc = params["lambda"] * new_weights[:,c] +  sum_term
+            gradient_wc = np.reshape(gradient_wc, (d,1))
+            gradient[:,:,c] = gradient_wc
 
         return nll, gradient
 
