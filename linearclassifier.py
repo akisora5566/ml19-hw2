@@ -28,14 +28,6 @@ def linear_predict(data, model):
     weighted_scores = np.matmul(weights, data)          # (#classes, d) * (d, n) = (#classes, n)
     predict_class = np.argmax(weighted_scores, axis=0)  # (,n)
 
-    """ Code by Georgia-max
-    score_all = np.zeros(num_classes)
-    for n in data.T:
-        score_one_data = np.dot(weights, n)
-        score_all = np.vstack([score_all, score_one_data])
-    score_all = np.delete(score_all, (0), axis=0)
-    predict_class = np.argmax(score_all, axis=1)
-    """
     return predict_class
 
 
@@ -107,7 +99,6 @@ def log_reg_train(data, labels, params, model=None, check_gradient=False):
 
         w_x = np.matmul(new_weights.T, data)        #(num_classes,n)
         logsumexp_w_x = logsumexp(w_x, dim=0)       #(1,n)
-        #print ("logsumexp_w_x, logsumexp_w_x.shape\n", logsumexp_w_x, logsumexp_w_x.shape)  # Leave it here
         sum_logsumexp_w_x = np.sum(logsumexp_w_x)
 
         sum_wyi_xi = 0
@@ -117,23 +108,22 @@ def log_reg_train(data, labels, params, model=None, check_gradient=False):
 
         frob_weights = np.linalg.norm(new_weights, ord='fro')
 
-        nll = (params["lambda"] / 2) + frob_weights + sum_logsumexp_w_x - sum_wyi_xi    # (1,n)
+        nll = (params["lambda"] / 2) * np.square(frob_weights) + sum_logsumexp_w_x - sum_wyi_xi    # 1 number, not a matrix
 
         # Compute the gradient
-        # TODO Revisit gradient check. Gradient difference too high
-        gradient = np.zeros((d, 1, num_classes))
+        gradient = np.zeros((d, num_classes))
         for c in range (0, num_classes):
-            wc_x =  np.matmul(new_weights[:, c].T, data)    # (1,n)
+            wc_x = np.matmul(new_weights[:, c].T, data)     # (1,n)
             logged_first_term = wc_x - logsumexp_w_x        # (1,n)
             first_term = np.exp(logged_first_term)          # (1,n)
             # - I(yi == c)
-            for i in range (0, n):
+            for i in range (0,n):
                 if labels[i] == c:
-                    first_term[0,i] -= 1
-            sum_term = np.sum(np.multiply(data, np.tile(first_term, (d,1))), axis=1)
-            gradient_wc = params["lambda"] * new_weights[:,c] +  sum_term
-            gradient_wc = np.reshape(gradient_wc, (d,1))
-            gradient[:,:,c] = gradient_wc
+                    first_term[0, i] = first_term[0, i] - 1
+            term_in_sum = np.multiply(data, first_term)
+            sum_term = np.sum(term_in_sum, axis=1)          # single constant
+            gradient_wc = np.multiply(params["lambda"], new_weights[:,c]) + sum_term    # (d,)
+            gradient[:, c] = gradient_wc
 
         return nll, gradient
 
